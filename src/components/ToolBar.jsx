@@ -1,7 +1,9 @@
 import styled from "styled-components";
+import { useRecoilState } from "recoil";
+import { isSelectModeAtom } from "../atom";
+
 import SelectIconImg from "../assets/select-icon.svg";
 import GenerateIconImg from "../assets/generate-icon.svg";
-import { useState } from "react";
 
 const ToolBarWrapper = styled.div`
   width: 50px;
@@ -35,7 +37,7 @@ const BoxGenerateButton = styled.button`
 const GenerateIcon = styled.img``;
 
 const ToolBar = () => {
-  const [isSelectMode, setIsSelectMode] = useState(true);
+  const [isSelectMode, setIsSelectMode] = useRecoilState(isSelectModeAtom);
 
   const selectButtonClick = () => {
     setIsSelectMode(true);
