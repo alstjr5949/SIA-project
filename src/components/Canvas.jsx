@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRecoilValue } from "recoil";
-import styled from "styled-components";
 import { isSelectModeAtom } from "../atom";
+
+import { isMouseInSquare } from "../utils/utilFunc";
+
+import styled from "styled-components";
 import RefreshImgIcon from "../assets/icon-upload.png";
 
 const CanvasWrapper = styled.div`
@@ -54,6 +57,7 @@ const Canvas = () => {
   const [imgCtx, setImgCtx] = useState();
   const [isDraw, setIsDraw] = useState(false);
   const [isDrag, setIsDrag] = useState(false);
+  const [isClicked, setIsClicked] = useState(false);
   const [currentSquareIndex, setCurrentSquareIndex] = useState();
   const [pos, setPos] = useState({
     x: 0,
@@ -71,6 +75,7 @@ const Canvas = () => {
 
   // DragCanvas drag draw function
   const drawStart = (e) => {
+    e.preventDefault();
     setIsDraw(true);
     setPos({
       x: e.pageX - 50 - dragCanvasRef.current.offsetLeft,
@@ -79,6 +84,7 @@ const Canvas = () => {
   };
 
   const drawSquare = (e) => {
+    e.preventDefault();
     if (!isDraw) return;
     dragCtx.clearRect(
       0,
@@ -127,6 +133,7 @@ const Canvas = () => {
 
   // drag function
   const dragStart = (e) => {
+    e.preventDefault();
     let startX = e.pageX;
     let startY = e.pageY;
 
@@ -139,6 +146,7 @@ const Canvas = () => {
     for (let square of squareArr) {
       if (isMouseInSquare(startX, startY, square)) {
         setCurrentSquareIndex(index);
+        setIsClicked(true);
         setIsDrag(true);
         return;
       }
@@ -147,6 +155,7 @@ const Canvas = () => {
   };
 
   const dragSqaure = (e) => {
+    e.preventDefault();
     if (!isDrag) {
       return;
     } else {
@@ -170,6 +179,7 @@ const Canvas = () => {
   };
 
   const dragEnd = (e) => {
+    e.preventDefault();
     if (!isDrag) {
       return;
     }
@@ -178,6 +188,7 @@ const Canvas = () => {
 
   // click function
   const boxClick = (e) => {
+    e.preventDefault();
     let startX = e.pageX;
     let startY = e.pageY;
 
@@ -186,40 +197,44 @@ const Canvas = () => {
       y: startY,
     });
 
+    let index = 0;
     for (let square of squareArr) {
       if (isMouseInSquare(startX, startY, square)) {
+        setCurrentSquareIndex(index);
         let currentSquare = squareArr[currentSquareIndex];
-        currentSquare.clicked = !currentSquare.clicked;
+        setIsClicked(true);
         drawAnchor(currentSquare);
         return;
       } else {
-        let currentSquare = squareArr[currentSquareIndex];
-        currentSquare.clicked = false;
+        setIsClicked(false);
+        drawSquareImgCanvas();
       }
+      index++;
     }
   };
 
-  // util
-  const isMouseInSquare = (x, y, square) => {
-    let squareLeft = square.x;
-    let squareRight = square.x + square.w;
-    let squareTop = square.y;
-    let squareBottom = square.y + square.h;
-
-    if (
-      x > squareLeft &&
-      x < squareRight &&
-      y > squareTop &&
-      y < squareBottom
-    ) {
-      return true;
+  // delete function
+  const deleteBox = (e) => {
+    if (e.key === "Delete" && squareArr.length > 0) {
+      const newSquareArr = [...squareArr];
+      newSquareArr.splice(currentSquareIndex, 1);
+      setSquareArr(newSquareArr);
     }
-    return false;
   };
 
+  const onKeyUpRedrawSqaure = (e) => {
+    if (e.key === "Delete") {
+      requestAnimationFrame(drawSquareImgCanvas);
+    }
+  };
+
+  window.addEventListener("keydown", deleteBox);
+  window.addEventListener("keyup", onKeyUpRedrawSqaure);
+
+  // draw function
   const drawAnchor = (square) => {
     let anchorWH = 10;
-    if (square.clicked) {
+    if (isClicked) {
       imgCtx.strokeStyle = "#5668D9";
       imgCtx.lineWidth = 2;
       imgCtx.fillStyle = "white";
@@ -357,7 +372,7 @@ const Canvas = () => {
   };
 
   const drawSquareImgCanvas = () => {
-    imgCtx.clearRect(
+    imgCtx?.clearRect(
       0,
       0,
       imgCanvasRef.current.width,
@@ -373,12 +388,17 @@ const Canvas = () => {
   };
 
   // img random generate function
-  const imgRefrechButtonOnclick = () => {
+  const imgRefreshButtonOnclick = () => {
     const randomIndex = Math.floor(Math.random() * 50);
     fetch("https://jsonplaceholder.typicode.com/albums/1/photos")
       .then((response) => response.json())
       .then((data) => setBgImg(data[randomIndex].url));
   };
+
+  const memoizedImgRefreshButtonOnclick = useCallback(
+    imgRefreshButtonOnclick,
+    []
+  );
 
   // first setting
   useEffect(() => {
@@ -391,8 +411,8 @@ const Canvas = () => {
 
   return (
     <CanvasWrapper>
-      <ImgRefreshButton type="button" onClick={imgRefrechButtonOnclick}>
-        <ImgRefreshIcon src={RefreshImgIcon} />
+      <ImgRefreshButton type="button" onClick={memoizedImgRefreshButtonOnclick}>
+        <ImgRefreshIcon src={RefreshImgIcon} alt="갤러리 아이콘" />
       </ImgRefreshButton>
       <ImgCanvas
         ref={imgCanvasRef}
@@ -403,6 +423,8 @@ const Canvas = () => {
         onMouseDown={dragStart}
         onMouseMove={dragSqaure}
         onMouseUp={dragEnd}
+        onKeyDown={deleteBox}
+        onKeyUp={onKeyUpRedrawSqaure}
         className={isSelectMode ? "selectMode" : ""}
       />
       <DragCanvas
